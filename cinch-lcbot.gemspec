@@ -6,7 +6,7 @@ Gem::Specification.new do |s|
   s.platform    = Gem::Platform::RUBY
   s.authors     = ["Phil S. Stein"]
   s.email       = ["phil.s.stein@gmail.com"]
-  s.homepage    = "https://github.com/phil_s_stein/cinch-lcbot"
+  s.homepage    = "https://github.com/philsstein/cinch-lcbot"
   s.summary     = %q{IRC Bot for playing Lost Cities}
   s.description = %q{Cinch-based IRC bot for playing the Lost Cities card game.}
 
