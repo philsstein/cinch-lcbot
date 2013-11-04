@@ -1,5 +1,9 @@
 require 'cinch'
 require 'yaml'
+require 'logger'
+
+$log = Logger.new(STDOUT)
+$log.level = Logger::DEBUG
 
 require File.expand_path(File.dirname(__FILE__)) + '/core'
 
@@ -18,10 +22,7 @@ module Cinch
         @mods          = config[:mods]
         @channel_name  = config[:channel]
         @settings_file = config[:settings]
-        @games_dir     = config[:games_dir]
-        @idle_timer_length    = config[:allowed_idle]
-        @invite_timer_length  = config[:invite_reset]
-        @idle_timer   = self.start_idle_timer
+
       end
 
       # start
@@ -74,18 +75,6 @@ module Cinch
       def devoice_everyone_on_start(m, user)
         if user == bot
           self.devoice_channel
-        end
-      end
-
-      def start_idle_timer
-        Timer(300) do
-          @game.players.map{|p| p.user }.each do |user|
-            user.refresh
-            if user.idle > @idle_timer_length
-              self.remove_user_from_game(user)
-              user.send "You have been removed from the #{@channel_name} game due to inactivity."
-            end
-          end
         end
       end
 
@@ -164,19 +153,20 @@ module Cinch
       #--------------------------------------------------------------------------------
       def join(m)
         # self.reset_timer(m)
+        $log.debug { "#{m.user} is trying to join the game." }
         if Channel(@channel_name).has_user?(m.user)
+          $log.debug { "#{m.user} is in the channel." }
           if @game.accepting_players? 
+            $log.debug { "The game is accepting players." }
             added = @game.add_player(m.user)
+            $log.debug { "#{m.user} has been added to the game." }
             unless added.nil?
-              # Channel(@channel_name).send "#{m.user.nick} has joined the game (#{@game.players.count}/2)"
-              # Channel(@channel_name).voice(m.user)
-              Channel(@channel_name).send "testing. join done."
+              Channel(@channel_name).send "#{m.user.nick} has joined the game (#{@game.players.count}/2)"
+              Channel(@channel_name).voice(m.user)
             end
           else
             if @game.started?
               Channel(@channel_name).send "#{m.user.nick}: Game has already started."
-            elsif @game.at_max_players?
-              Channel(@channel_name).send "#{m.user.nick}: Game is at max players."
             else
               Channel(@channel_name).send "#{m.user.nick}: You cannot join."
             end
@@ -205,7 +195,6 @@ module Cinch
         unless @game.started?
           if @game.at_min_players?
             if @game.has_player?(m.user)
-              @idle_timer.stop
               @game.start_game!
               Channel(@channel_name).send "The game has started."
             else
@@ -231,7 +220,6 @@ module Cinch
           Channel(@channel_name).devoice(p.user)
         end
         @game = Game.new
-        @idle_timer.start
       end
 
       def devoice_channel
@@ -292,7 +280,6 @@ module Cinch
           @game = Game.new
           self.devoice_channel
           Channel(@channel_name).send "The game has been reset."
-          @idle_timer.start
         end
       end
 

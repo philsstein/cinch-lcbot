@@ -1,7 +1,7 @@
 require 'logger'
 
-log = Logger.new(STDOUT) 
-log.level = Logger::DEBUG
+$log = Logger.new(STDOUT) 
+$log.level = Logger::DEBUG
 
 #================================================================================
 # GAME
@@ -31,7 +31,7 @@ class Game
   end
 
   def accepting_players?
-    self.not_started? && ! self.players.count == 2
+    self.not_started? && ! self.at_min_players?
   end
 
   def check_game_state
@@ -62,12 +62,12 @@ class Game
   end
 
   def find_player(user)
-    self.players[0] == user or self.players[1] == user
+    self.players.find { |p| p.user == user }
   end
 
   def has_player?(user)
     found = self.find_player(user)
-    log.debug("Looking for #{user}. Found: #{found}")
+    $log.debug { "Looking for #{user} in game. Found: #{found}" }
     found.nil? ? false : true
   end
 

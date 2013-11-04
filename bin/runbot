@@ -8,8 +8,17 @@ bot = Cinch::Bot.new do
   configure do |c|
     c.server = 'irc.freenode.net'
     c.channels = ['#foober']
+    c.mods = ['phil_s_stein']
     c.nick = 'LostCitiesBot'
-    c.plugins.plugins = [Cinch::Plugins::Hello, Cinch::Plugins::LostCities]
+    c.plugins.plugins = [
+      Cinch::Plugins::Hello,
+      Cinch::Plugins::LostCities
+    ]
+    c.plugins.options[Cinch::Plugins::LostCities] = {
+      :mods     => ["phil_s_stein"],
+      :channel  => "#foober",
+      :settings => "settings.yml"
+    }
   end
 end
 
