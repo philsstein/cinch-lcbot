@@ -1,21 +1,22 @@
+require 'logger'
 
-require 'json'
+log = Logger.new(STDOUT) 
+log.level = Logger::DEBUG
 
 #================================================================================
 # GAME
 #================================================================================
-
-$player_count = 0
-
 class Game
 
-  attr_accessor :started, :players, :table
+  include Cinch::Formatting
+
+  attr_accessor :started, :players, :deck
   
   def initialize
     self.started  = false
     self.players  = []    # list of Players
     self.deck     = []    # list of Cards
-    self.discards = []    # list of Cards
+    @discards = []    # list of Cards
   end
 
   #----------------------------------------------
@@ -30,7 +31,7 @@ class Game
   end
 
   def accepting_players?
-    self.not_started? && ! self.at_max_players?
+    self.not_started? && ! self.players.count == 2
   end
 
   def check_game_state
@@ -46,12 +47,8 @@ class Game
   # Game Setup
   #----------------------------------------------
   # Player handlers
-  def at_max_players?
-    self.player_count == 2
-  end
-
   def at_min_players?
-    self.player_count == 2
+    self.players.count == 2
   end
 
   def add_player(user)
@@ -64,8 +61,13 @@ class Game
     added
   end
 
+  def find_player(user)
+    self.players[0] == user or self.players[1] == user
+  end
+
   def has_player?(user)
     found = self.find_player(user)
+    log.debug("Looking for #{user}. Found: #{found}")
     found.nil? ? false : true
   end
 
@@ -120,13 +122,22 @@ class Game
     scores
   end
 
+  def get_table
+    retval = ""
+    Card.colors.each do |c|
+      retval += Format(c, "%-28s | %28s\n" % [self.players[0].played[c].join(','), 
+                                              self.players[1].played[c].join(',')])
+    end
+    retval += self.get_score
+    retval
+  end
 end
 
 #================================================================================
 # PLAYER
 #================================================================================
 class Player
-  attr_accessor :user, :hand
+  attr_accessor :user, :hand, :played
 
   def initialize(user)
     self.user = user
@@ -151,7 +162,10 @@ class Card
 
   # note that 1s are investment cards.
   @@values = [1,1,1,2,3,4,5,6,7,8,9,10]
-  @@colors = [:R, :B, :G, :Y, :W]
+  # note these should match the colors identifiers in Cinch::Formatting
+  @@colors = [:red, :blue, :green, :yellow, :white]
+
+  @cmap = { :red => 'R', :blue => 'B', :green => 'G', :yellow => 'Y', :white => 'W' }
 
   def initialize(value, color)
     self.color = color
@@ -159,7 +173,7 @@ class Card
   end
 
   def to_s
-    "#{self.color}#{self.value}"
+    Format(self.color, "#{self.cmap[self.color]}#{self.value}")
   end
 
   def ==(lhs)

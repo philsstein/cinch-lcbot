@@ -8,23 +8,19 @@ module Cinch
 
     CHANGELOG_FILE = File.expand_path(File.dirname(__FILE__)) + "/changelog.yml"
 
-    class LostCitiesGame
+    class LostCities
       include Cinch::Plugin
 
       def initialize(*args)
         super
         @game = Game.new
- 
         @changelog     = self.load_changelog
-
         @mods          = config[:mods]
         @channel_name  = config[:channel]
         @settings_file = config[:settings]
         @games_dir     = config[:games_dir]
-
         @idle_timer_length    = config[:allowed_idle]
         @invite_timer_length  = config[:invite_reset]
-
         @idle_timer   = self.start_idle_timer
       end
 
@@ -35,7 +31,9 @@ module Cinch
 
       # game
       #match /whoami/i,           :method => :whoami
-
+      match /play (.+)/i,         :method => :play_card
+      match /discard (.+)/i,      :method => :discard
+      match /xyzzy/i,             :method => :xyzzy
       match /status/i,            :method => :status
 
       # match /invite/i,              :method => :invite
@@ -132,9 +130,7 @@ module Cinch
       end
 
       def rules(m, section)
-        case section.to_s.downcase
-          User(m.user).send "Errr. So I kinda lied about the rules thing. Read the rules on BGG."
-        end
+        User(m.user).send "Errr. So I kinda lied about the rules thing. Read the rules on BGG."
       end
 
       def list_players(m)
@@ -172,9 +168,9 @@ module Cinch
           if @game.accepting_players? 
             added = @game.add_player(m.user)
             unless added.nil?
-              Channel(@channel_name).send "#{m.user.nick} has joined the game "\
-                "(#{@game.players.count}/2)"
-              Channel(@channel_name).voice(m.user)
+              # Channel(@channel_name).send "#{m.user.nick} has joined the game (#{@game.players.count}/2)"
+              # Channel(@channel_name).voice(m.user)
+              Channel(@channel_name).send "testing. join done."
             end
           else
             if @game.started?
@@ -211,7 +207,6 @@ module Cinch
             if @game.has_player?(m.user)
               @idle_timer.stop
               @game.start_game!
-              self.start_game
               Channel(@channel_name).send "The game has started."
             else
               m.reply "You are not in the game.", true
@@ -225,9 +220,6 @@ module Cinch
       #--------------------------------------------------------------------------------
       # Game interaction methods
       #--------------------------------------------------------------------------------
-      def start_game
-        Channel(@channel_name).send("#{@game.players[0]} goes first.")
-      end
 
       def status(m)
         m.reply @game.check_game_state
@@ -261,6 +253,23 @@ module Cinch
 
       def dehighlight_nick(nickname)
         nickname.scan(/.{2}|.+/).join(8203.chr('UTF-8'))
+      end
+
+      def play_card(m, card)
+        if @game.started?
+          m.reply "You played the #{card} card"
+        else
+          m.replay 'You can !play all you want, but with no active game, you\'ll just be '\
+                   'playing with yourself.'
+        end
+      end
+
+      def discard(m, card)
+        m.reply "You discarded the #{card} card"
+      end
+
+      def xyzzy
+        m.reply @game.started? ? 'Twice as much happens.' : 'Nothing happens.'
       end
 
       #--------------------------------------------------------------------------------
@@ -336,40 +345,9 @@ module Cinch
         end
       end
 
-      def what_roles(m)
-        if self.is_mod? m.user.nick
-          if @game.started?
-            if @game.has_player?(m.user)
-              User(m.user).send "You are in the game, goof!"
-            else
-              roles_msg = @game.players.map do |player|
-                "#{player} - #{player.role.upcase}"
-              end.join(', ')
-              User(m.user).send "Starting Roles: #{roles_msg}"
-              if @game.day?
-                roles_msg = @game.players.map{ |player| player.new_role.nil? ? "#{player} - #{player.role.upcase}" : Format(:bold, "#{player} - #{player.new_role.upcase}")}.join(', ')
-                User(m.user).send "Current Roles: #{roles_msg}"
-                player = @game.find_player_by_role(:seer)
-                unless player.nil?
-                  if player.seer_view.has_key?(:player)
-                    User(m.user).send "Seer looked at #{player.seer_view[:player]} and saw: #{player.seer_view[:player].role.upcase}"
-                  elsif player.seer_view.has_key?(:table)
-                    User(m.user).send "Seer looked at the table and saw: #{player.seer_view[:table]}"
-                  end
-                end
-              end
-            end
-          else
-            User(m.user).send "There is no game going on."
-          end
-        end
-      end
-
-
       #--------------------------------------------------------------------------------
       # Settings
       #--------------------------------------------------------------------------------
-      
       def save_settings(settings)
         output = File.new(@settings_file, 'w')
         output.puts YAML.dump(settings)
@@ -391,9 +369,6 @@ module Cinch
 
         changelog
       end
-      
-
     end
-    
   end
 end

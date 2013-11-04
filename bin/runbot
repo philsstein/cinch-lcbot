@@ -1,0 +1,16 @@
+#!/usr/bin/env ruby
+
+require "cinch"
+require "cinch/plugins/hello"
+require "cinch/plugins/LostCities"
+
+bot = Cinch::Bot.new do
+  configure do |c|
+    c.server = 'irc.freenode.net'
+    c.channels = ['#foober']
+    c.nick = 'LostCitiesBot'
+    c.plugins.plugins = [Cinch::Plugins::Hello, Cinch::Plugins::LostCities]
+  end
+end
+
+bot.start
