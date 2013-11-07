@@ -8,7 +8,7 @@ $log.level = Logger::DEBUG
 #================================================================================
 class Game
 
-  include Cinch::Formatting
+  include Cinch::Helpers
 
   attr_accessor :started, :players, :deck
   
@@ -16,7 +16,12 @@ class Game
     self.started  = false
     self.players  = []    # list of Players
     self.deck     = []    # list of Cards
-    @discards = []    # list of Cards
+    @discards = {}        # hash of cards indexed by color.
+    @cur_player_index = 0
+
+    Card.colors.each do |c|
+      @discards[c] = []
+    end
   end
 
   #----------------------------------------------
@@ -65,10 +70,18 @@ class Game
     self.players.find { |p| p.user == user }
   end
 
+  def current_player
+      self.players[@cur_player_index]
+  end
+
   def has_player?(user)
     found = self.find_player(user)
     $log.debug { "Looking for #{user} in game. Found: #{found}" }
     found.nil? ? false : true
+  end
+
+  def players_turn?(user)
+    user == self.current_player.user
   end
 
   def remove_player(user)
@@ -82,6 +95,17 @@ class Game
   end
 
   #----------------------------------------------
+  # Helpers
+  #----------------------------------------------
+  def hand(user)
+      if not self.has_player?(user)
+          'You are not in the game.'
+      else
+        "Your hand is #{self.find_player(user).hand}"
+      end
+  end
+
+  #----------------------------------------------
   # Game 
   #----------------------------------------------
 
@@ -91,13 +115,14 @@ class Game
     self.started = true
     Card.colors.each do |c|
       Card.values.each do |v|
-        self.deck << Card.new(v, c)
+        self.deck << Card.new(c, v)
       end
     end
     self.deck.shuffle!
     self.players.shuffle!
-    self.players[0].hand = self.deck.pop(4)
-    self.players[1].hand = self.deck.pop(4)
+    self.players[0].hand = self.deck.pop(5)
+    self.players[1].hand = self.deck.pop(5)
+    @cur_player_index = 0
   end
 
   def get_score(played)
@@ -118,18 +143,51 @@ class Game
       scores[color] = score
       total += score
     end
-    scores[:total] = score
+    scores[:total] = total
     scores
   end
 
   def get_table
     retval = ""
     Card.colors.each do |c|
-      retval += Format(c, "%-28s | %28s\n" % [self.players[0].played[c].join(','), 
+      retval += Format(c, "| %-28s | %28s |\n" % [self.players[0].played[c].join(','), 
                                               self.players[1].played[c].join(',')])
     end
-    retval += self.get_score
+    self.players.each do |p|
+      retval += "#{p}: #{self.get_score p.played}\n"
+    end
     retval
+  end
+
+  def play_card(user, card)
+      retval = ''
+      if not self.players_turn? user
+          retval = "It is not your turn. It is #{self.current_player.user.nick}'s turn."
+      elsif not Card.valid_card? card
+          retval = "#{card} is not a valid card."
+      else
+          c = Card.new(card)
+          $log.debug("looking for card in hand. card: #{c}, hand: #{self.current_player.hand}")
+          if not self.current_player.hand.index(c)
+              retval = "You do not have the #{card} in your hand."
+          else
+              if Card.can_be_next? c
+                # move the card from player's hand into appropriate discard pile.
+                self.current_player.delete(c)
+                self.discards[c.color] << c
+              else
+                'That card is not currently playable.'
+              end
+          end
+      end
+  end
+
+  def discard(user, card)
+      "You discarded #{card}."
+  end
+
+  def take_card(user, card)
+      "You took card #{card}."
   end
 end
 
@@ -158,38 +216,60 @@ end
 #================================================================================
 class Card
 
+  include Cinch::Helpers
+
   attr_accessor :color, :value, :colors, :values
 
   # note that 1s are investment cards.
   @@values = [1,1,1,2,3,4,5,6,7,8,9,10]
   # note these should match the colors identifiers in Cinch::Formatting
   @@colors = [:red, :blue, :green, :yellow, :white]
+  @@colmap = { :red => 'R', :blue => 'B', :green => 'G', :yellow => 'Y', :white => 'W' }
 
-  @cmap = { :red => 'R', :blue => 'B', :green => 'G', :yellow => 'Y', :white => 'W' }
-
-  def initialize(value, color)
-    self.color = color
-    self.value = value
+  def initialize *args
+      $log.debug("creating cards given args: #{args}")
+      case args.size
+      when 1
+          # c = Card.new('R4')
+          @color = @@colmap.key(args[0][0])
+          @value = ['+', "2", "3", "4", "5", "6", "7", "8", "9", "10"].index(args[0][1..-1])
+          if @value == '+'
+              @value = 1
+          else
+              @value = Integer(@value)
+          end
+      when 2
+          # c = Card.new(Card.colors[0], 4)
+          @color = args[0]
+          @value = args[1]
+      else
+          raise "bad card #{args}"
+      end
   end
 
   def to_s
-    Format(self.color, "#{self.cmap[self.color]}#{self.value}")
+    if @value == 1
+        Format(@color, "#{@@colmap[@color]}+")
+    else
+        Format(@color, "#{@@colmap[@color]}#{@value}")
+    end
   end
 
   def ==(lhs)
-    self.color == lhs.color and self.value == lhs.value
+    $log.debug("Comparing cards #{self} and #{lhs}")
+    @color == lhs.color and @value == lhs.value
   end
 
   def can_be_next?(c)
-    if self.value == 1
-      c.value == 1 && self.color == c.color
+    if @value == 1
+      c.value == 1 && @color == c.color
     else
-      self.value < c.value and self.color == c.color
+      @value < c.value and @color == c.color
     end
   end
 
   def is_investment?
-    self.value == 1
+    @value == 1
   end
 
   def self.colors
@@ -198,6 +278,15 @@ class Card
 
   def self.values
     @@values
+  end
+
+  def self.valid_card?(str)
+      $log.debug("testing card #{str} for validity")
+      color = @@colmap.key(str[0])
+      value = ['+', '2', '3', '4', '5', '6', '7', '8', '9', '10'].select { |i| i == str[1..-1] }
+      $log.debug("found color: #{color}")
+      $log.debug("found value: #{value}")
+      not (color.nil? or value.nil?)
   end
 end
 

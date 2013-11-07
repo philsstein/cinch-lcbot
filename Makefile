@@ -18,6 +18,9 @@ $(GEMFILE): $(FILES)
 run: $(INSTALL_PATH)
 	@./bin/runbot
 
+tags:
+	@ctags $(FILES)
+
 clean: 
 	echo $(INSTALL_PATH)
 	@gem uninstall $(GEMFILE)

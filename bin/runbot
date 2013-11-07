@@ -1,17 +1,15 @@
 #!/usr/bin/env ruby
 
 require "cinch"
-require "cinch/plugins/hello"
 require "cinch/plugins/LostCities"
 
 bot = Cinch::Bot.new do
   configure do |c|
-    c.server = 'irc.freenode.net'
+    c.server = 'localhost'
     c.channels = ['#foober']
     c.mods = ['phil_s_stein']
-    c.nick = 'LostCitiesBot'
+    c.nick = 'LCBot'
     c.plugins.plugins = [
-      Cinch::Plugins::Hello,
       Cinch::Plugins::LostCities
     ]
     c.plugins.options[Cinch::Plugins::LostCities] = {

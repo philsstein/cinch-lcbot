@@ -34,6 +34,9 @@ module Cinch
       #match /whoami/i,           :method => :whoami
       match /play (.+)/i,         :method => :play_card
       match /discard (.+)/i,      :method => :discard
+      match /take (.+)/i,         :method => :take_card
+      match /table/i,             :method => :table
+      match /hand/i,              :method => :hand
       match /xyzzy/i,             :method => :xyzzy
       match /status/i,            :method => :status
 
@@ -163,6 +166,9 @@ module Cinch
             unless added.nil?
               Channel(@channel_name).send "#{m.user.nick} has joined the game (#{@game.players.count}/2)"
               Channel(@channel_name).voice(m.user)
+              if @game.players.count == 2
+                  self.start_game(m)
+              end
             end
           else
             if @game.started?
@@ -197,6 +203,10 @@ module Cinch
             if @game.has_player?(m.user)
               @game.start_game!
               Channel(@channel_name).send "The game has started."
+              Channel(@channel_name).send "#{@game.current_player} goes first."
+              @game.players.each do |p|
+                User(p.user).send @game.hand(p.user)
+              end
             else
               m.reply "You are not in the game.", true
             end
@@ -245,7 +255,7 @@ module Cinch
 
       def play_card(m, card)
         if @game.started?
-          m.reply "You played the #{card} card"
+          m.reply @game.play_card(m.user, card)
         else
           m.replay 'You can !play all you want, but with no active game, you\'ll just be '\
                    'playing with yourself.'
@@ -253,7 +263,35 @@ module Cinch
       end
 
       def discard(m, card)
-        m.reply "You discarded the #{card} card"
+        if @game.started?
+          m.reply @game.discard(m.user, card)
+        else
+          m.reply 'There is no active game.'
+        end
+      end
+
+      def take_card(m, card)
+        if @game.started?
+          m.reply @game.take_card(m.user, card)
+        else
+          m.reply 'There is no active game.'
+        end
+      end
+
+      def table(m)
+        if @game.started?
+          m.reply @game.get_table
+        else
+          m.reply 'There is no active game.'
+        end
+      end
+
+      def hand(m)
+        if @game.started?
+           User(m.user).send @game.hand(m.user)
+        else
+          m.reply 'There is no active game.'
+        end
       end
 
       def xyzzy
