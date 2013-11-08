@@ -34,9 +34,10 @@ module Cinch
       #match /whoami/i,           :method => :whoami
       match /play (.+)/i,         :method => :play_card
       match /discard (.+)/i,      :method => :discard
-      match /take (.+)/i,         :method => :take_card
+      match /draw ?(.+)?/i,       :method => :draw_card
       match /table/i,             :method => :table
       match /hand/i,              :method => :hand
+      match /turn/i,              :method => :turn
       match /xyzzy/i,             :method => :xyzzy
       match /status/i,            :method => :status
 
@@ -256,6 +257,8 @@ module Cinch
       def play_card(m, card)
         if @game.started?
           m.reply @game.play_card(m.user, card)
+          User(m.user).send @game.hand(m.user)
+          self.table(m)
         else
           m.replay 'You can !play all you want, but with no active game, you\'ll just be '\
                    'playing with yourself.'
@@ -265,14 +268,18 @@ module Cinch
       def discard(m, card)
         if @game.started?
           m.reply @game.discard(m.user, card)
+          User(m.user).send @game.hand(m.user)
+          self.table(m)
         else
           m.reply 'There is no active game.'
         end
       end
 
-      def take_card(m, card)
+      def draw_card(m, card)
         if @game.started?
-          m.reply @game.take_card(m.user, card)
+          m.reply @game.draw_card(m.user, card)
+          User(m.user).send @game.hand(m)
+          self.table(m)
         else
           m.reply 'There is no active game.'
         end
@@ -289,6 +296,14 @@ module Cinch
       def hand(m)
         if @game.started?
            User(m.user).send @game.hand(m.user)
+        else
+          m.reply 'There is no active game.'
+        end
+      end
+
+      def turn(m)
+        if @game.started?
+           User(m.user).send @game.turn
         else
           m.reply 'There is no active game.'
         end
